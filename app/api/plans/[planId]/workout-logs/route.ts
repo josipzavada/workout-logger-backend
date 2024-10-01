@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@vercel/postgres';
 
+export const dynamic = 'force-dynamic';
+
 // Define types for the data returned from the database
 interface Plan {
   id: string;
