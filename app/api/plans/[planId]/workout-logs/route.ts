@@ -96,7 +96,7 @@ export async function GET(req: Request, { params }: { params: { planId: string }
       LEFT JOIN workout_target vt ON vt.id = ws.target_volume_id
       LEFT JOIN workout_target wt ON wt.id = ws.target_weight_id
       WHERE wl.plan_id = $1
-      ORDER BY wl.log_time
+      ORDER BY wl.id
     `;
 
     const { rows } = await sql.query<WorkoutLogRow>(logsQuery, [planId]);
