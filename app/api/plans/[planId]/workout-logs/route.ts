@@ -145,7 +145,7 @@ export async function GET(req: Request, { params }: { params: { planId: string }
       workouts: workouts,
     };
 
-    return NextResponse.json({ workoutPlanItem });
+    return NextResponse.json(workoutPlanItem);
   } catch (error) {
     console.error('Error fetching workout logs:', error);
     return NextResponse.json({ error: 'Failed to fetch workout logs' }, { status: 500 });
