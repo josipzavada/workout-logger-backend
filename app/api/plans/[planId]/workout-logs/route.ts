@@ -11,6 +11,11 @@ interface Plan {
   workouts: Workout[];
 }
 
+interface PlanRow {
+  id: string;
+  type_name: string;
+}
+
 interface WorkoutLogRow {
   log_id: string;
   log_time: string;
@@ -69,13 +74,13 @@ export async function GET(req: Request, { params }: { params: { planId: string }
       FROM workout_plan_item
       WHERE id = $1
     `;
-    const planResult = await sql.query<Plan>(planQuery, [planId]);
+    const planResult = await sql.query<PlanRow>(planQuery, [planId]);
 
     if (planResult.rowCount === 0) {
       return NextResponse.json({ error: 'Workout plan not found' }, { status: 404 });
     }
 
-    const plan = planResult.rows[0];
+    const firstPlanRow = planResult.rows[0];
 
     const logsQuery = `
       SELECT wl.id as log_id, wl.log_time, wl.value, wl.weight, wl.one_rep_max, 
@@ -103,9 +108,9 @@ export async function GET(req: Request, { params }: { params: { planId: string }
       // If there's no plan for this log date yet, create one
       if (!acc[logDate]) {
         acc[logDate] = {
-          id: plan.id,
+          id: firstPlanRow.id,
           logDate: logDate,
-          type: plan.type,
+          type: firstPlanRow.type_name,
           workouts: []
         };
       }
