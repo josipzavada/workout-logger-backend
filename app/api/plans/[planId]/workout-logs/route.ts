@@ -6,7 +6,9 @@ export const dynamic = 'force-dynamic';
 // Define types for the data returned from the database
 interface Plan {
   id: string;
-  type_name: string;
+  logDate: string;
+  type: string;
+  workouts: Workout[];
 }
 
 interface WorkoutLogRow {
@@ -89,13 +91,25 @@ export async function GET(req: Request, { params }: { params: { planId: string }
       LEFT JOIN workout_target vt ON vt.id = ws.target_volume_id
       LEFT JOIN workout_target wt ON wt.id = ws.target_weight_id
       WHERE wl.plan_id = $1
-      ORDER BY wl.id
+      ORDER BY wl.log_time
     `;
 
     const { rows } = await sql.query<WorkoutLogRow>(logsQuery, [planId]);
 
-    const workouts = rows.reduce((acc: Workout[], row: WorkoutLogRow) => {
-      const workout = acc.find((w) => w.id === row.workout_id);
+    // Group the workout logs by their log_time
+    const plansByDate = rows.reduce((acc: { [date: string]: Plan }, row: WorkoutLogRow) => {
+      const logDate = row.log_time; // Group by date only (without time)
+
+      // If there's no plan for this log date yet, create one
+      if (!acc[logDate]) {
+        acc[logDate] = {
+          id: plan.id,
+          logDate: logDate,
+          type: plan.type,
+          workouts: []
+        };
+      }
+
       const targetVolume = getTargetObject({
         type: row.volume_target_type,
         percentage_of_maximum: row.volume_percentage_of_maximum,
@@ -103,6 +117,7 @@ export async function GET(req: Request, { params }: { params: { planId: string }
         interval_start: row.volume_interval_start,
         interval_end: row.volume_interval_end,
       });
+
       const targetWeight = getTargetObject({
         type: row.weight_target_type,
         percentage_of_maximum: row.weight_percentage_of_maximum,
@@ -111,6 +126,8 @@ export async function GET(req: Request, { params }: { params: { planId: string }
         interval_end: row.weight_interval_end,
       });
 
+      // Find or create the workout within this plan
+      const workout = acc[logDate].workouts.find((w) => w.id === row.workout_id);
       if (workout) {
         workout.sets.push({
           id: row.set_id!,
@@ -120,7 +137,7 @@ export async function GET(req: Request, { params }: { params: { planId: string }
           weight: row.weight || null,
         });
       } else {
-        acc.push({
+        acc[logDate].workouts.push({
           id: row.workout_id,
           name: row.workout_name,
           volumeUnit: row.volume_unit,
@@ -137,19 +154,14 @@ export async function GET(req: Request, { params }: { params: { planId: string }
           ],
         });
       }
+
       return acc;
-    }, []);
+    }, {});
 
-    const latestLogDate = rows.length > 0 ? rows[0].log_time : null;
+    // Convert the plansByDate object to an array of Plan objects
+    const plansArray: Plan[] = Object.values(plansByDate);
 
-    const workoutPlanItem = {
-      id: plan.id,
-      type: plan.type_name,
-      logDate: latestLogDate,
-      workouts: workouts,
-    };
-
-    return NextResponse.json(workoutPlanItem);
+    return NextResponse.json(plansArray);
   } catch (error) {
     console.error('Error fetching workout logs:', error);
     return NextResponse.json({ error: 'Failed to fetch workout logs' }, { status: 500 });
