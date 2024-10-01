@@ -51,6 +51,7 @@ interface Workout {
 }
 
 interface Set {
+  id: string;
   targetVolume: Target | null;
   targetWeight: Target | null;
   volume: number | null;
@@ -112,6 +113,7 @@ export async function GET(req: Request, { params }: { params: { planId: string }
 
       if (workout) {
         workout.sets.push({
+          id: row.set_id!,
           targetVolume,
           targetWeight: targetWeight || null,
           volume: row.value || null,
@@ -126,6 +128,7 @@ export async function GET(req: Request, { params }: { params: { planId: string }
           logDate: row.log_time || null,
           sets: [
             {
+              id: row.set_id!,
               targetVolume,
               targetWeight: targetWeight || null,
               volume: row.value || null,
@@ -140,6 +143,7 @@ export async function GET(req: Request, { params }: { params: { planId: string }
     const latestLogDate = rows.length > 0 ? rows[0].log_time : null;
 
     const workoutPlanItem = {
+      id: plan.id,
       type: plan.type_name,
       logDate: latestLogDate,
       workouts: workouts,
