@@ -1,6 +1,60 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@vercel/postgres';
 
+// Define types for the data returned from the database
+interface Plan {
+  id: string;
+  type_name: string;
+}
+
+interface WorkoutLogRow {
+  log_id: string;
+  log_time: string;
+  value: number | null;
+  weight: number | null;
+  one_rep_max: number | null;
+  workout_id: string;
+  workout_name: string;
+  volume_unit: string;
+  workout_one_rep_max: number | null;
+  set_id: string | null;
+  target_volume_id: string | null;
+  target_weight_id: string | null;
+  volume_target_type: string | null;
+  volume_percentage_of_maximum: number | null;
+  volume_exact_value: number | null;
+  volume_interval_start: number | null;
+  volume_interval_end: number | null;
+  weight_target_type: string | null;
+  weight_percentage_of_maximum: number | null;
+  weight_exact_value: number | null;
+  weight_interval_start: number | null;
+  weight_interval_end: number | null;
+}
+
+interface Target {
+  type: 'maximum' | 'percentageOfMaximum' | 'exact' | 'interval';
+  value?: number;
+  start?: number;
+  end?: number;
+}
+
+interface Workout {
+  id: string;
+  name: string;
+  volumeUnit: string;
+  oneRepMax: number | null;
+  logDate: string | null;
+  sets: Set[];
+}
+
+interface Set {
+  targetVolume: Target | null;
+  targetWeight: Target | null;
+  volume: number | null;
+  weight: number | null;
+}
+
 export async function GET(req: Request, { params }: { params: { planId: string } }) {
   const { planId } = params;
 
@@ -10,7 +64,7 @@ export async function GET(req: Request, { params }: { params: { planId: string }
       FROM workout_plan_item
       WHERE id = $1
     `;
-    const planResult = await sql.query(planQuery, [planId]);
+    const planResult = await sql.query<Plan>(planQuery, [planId]);
 
     if (planResult.rowCount === 0) {
       return NextResponse.json({ error: 'Workout plan not found' }, { status: 404 });
@@ -35,9 +89,9 @@ export async function GET(req: Request, { params }: { params: { planId: string }
       ORDER BY wl.id
     `;
 
-    const { rows } = await sql.query(logsQuery, [planId]);
+    const { rows } = await sql.query<WorkoutLogRow>(logsQuery, [planId]);
 
-    const workouts = rows.reduce((acc: any[], row: any) => {
+    const workouts = rows.reduce((acc: Workout[], row: WorkoutLogRow) => {
       const workout = acc.find((w) => w.id === row.workout_id);
       const targetVolume = getTargetObject({
         type: row.volume_target_type,
@@ -86,7 +140,7 @@ export async function GET(req: Request, { params }: { params: { planId: string }
     const workoutPlanItem = {
       type: plan.type_name,
       logDate: latestLogDate,
-      workouts: workouts
+      workouts: workouts,
     };
 
     return NextResponse.json({ workoutPlanItem });
@@ -96,18 +150,24 @@ export async function GET(req: Request, { params }: { params: { planId: string }
   }
 }
 
-function getTargetObject(row: any) {
+function getTargetObject(row: {
+  type: string | null;
+  percentage_of_maximum: number | null;
+  exact_value: number | null;
+  interval_start: number | null;
+  interval_end: number | null;
+}): Target | null {
   if (!row.type) return null;
 
   switch (row.type) {
     case 'maximum':
       return { type: 'maximum' };
     case 'percentageOfMaximum':
-      return { type: 'percentageOfMaximum', value: row.percentage_of_maximum };
+      return { type: 'percentageOfMaximum', value: row.percentage_of_maximum || undefined };
     case 'exact':
-      return { type: 'exact', value: row.exact_value };
+      return { type: 'exact', value: row.exact_value || undefined };
     case 'interval':
-      return { type: 'interval', start: row.interval_start, end: row.interval_end };
+      return { type: 'interval', start: row.interval_start || undefined, end: row.interval_end || undefined };
     default:
       return null;
   }
