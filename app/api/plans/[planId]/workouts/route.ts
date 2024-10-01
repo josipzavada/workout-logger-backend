@@ -53,6 +53,7 @@ export async function GET(req: Request, { params }: { params: { planId: string }
 
       if (workout) {
         workout.sets.push({
+          id: row.set_id,
           targetVolume,
           targetWeight: targetWeight || null,
         });
@@ -64,6 +65,7 @@ export async function GET(req: Request, { params }: { params: { planId: string }
           oneRepMax: row.one_rep_max || null,
           sets: [
             {
+              id: row.set_id,
               targetVolume,
               targetWeight: targetWeight || null,
             },
@@ -75,7 +77,7 @@ export async function GET(req: Request, { params }: { params: { planId: string }
 
     const workoutPlan = {
       id: plan.id,
-      typeName: plan.type_name,
+      type: plan.type_name,
       workouts: workouts,
     };
 
