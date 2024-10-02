@@ -6,11 +6,11 @@ export async function POST(req: Request, { params }: { params: { planId: string 
 
   try {
     const data = await req.json();
-    const { workouts, type } = data;
+    const { workouts } = data;
 
     for (const workout of workouts) {
       for (const set of workout.sets) {
-        const { id: workoutSetId, volume, weight, targetVolume, targetWeight } = set;
+        const { id: workoutSetId, volume, weight } = set;
 
         const insertLogQuery = `
           INSERT INTO workout_log (plan_id, workout_id, workout_set_id, log_time, value, weight, one_rep_max)
