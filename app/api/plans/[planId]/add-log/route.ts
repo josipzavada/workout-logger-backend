@@ -9,12 +9,14 @@ export async function POST(req: Request, { params }: { params: { planId: string 
     const { workouts } = data;
 
     for (const workout of workouts) {
+      const { oneRepMax } = workout;
+
       for (const set of workout.sets) {
         const { id: workoutSetId, volume, weight } = set;
 
         const insertLogQuery = `
           INSERT INTO workout_log (plan_id, workout_id, workout_set_id, log_time, value, weight, one_rep_max)
-          VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5, NULL)
+          VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5, $6)
         `;
 
         await sql.query(insertLogQuery, [
@@ -23,6 +25,7 @@ export async function POST(req: Request, { params }: { params: { planId: string 
           workoutSetId,
           volume,
           weight,
+          oneRepMax || null,
         ]);
       }
     }
