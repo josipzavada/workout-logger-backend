@@ -8,6 +8,8 @@ export async function POST(req: Request, { params }: { params: { planId: string 
     const data = await req.json();
     const { workouts } = data;
 
+    const logTime = new Date().toISOString();
+
     for (const workout of workouts) {
       const { oneRepMax } = workout;
 
@@ -16,13 +18,14 @@ export async function POST(req: Request, { params }: { params: { planId: string 
 
         const insertLogQuery = `
           INSERT INTO workout_log (plan_id, workout_id, workout_set_id, log_time, value, weight, one_rep_max)
-          VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5, $6)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
         `;
 
         await sql.query(insertLogQuery, [
           planId,
           workout.id,
           workoutSetId,
+          logTime,
           volume,
           weight,
           oneRepMax || null,
