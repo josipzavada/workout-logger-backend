@@ -146,7 +146,7 @@ export async function GET(req: Request, { params }: { params: { planId: string }
           id: row.workout_id,
           name: row.workout_name,
           volumeUnit: row.volume_unit,
-          oneRepMax: row.workout_one_rep_max || null,
+          oneRepMax: row.one_rep_max || null,
           logDate: row.log_time || null,
           sets: [
             {
