@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Workout Tracker API
 
-## Getting Started
+This API provides endpoints for managing workout plans and logs. It's built using Next.js and Vercel Postgres.
 
-First, run the development server:
+## Database Structure
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+The database consists of the following tables:
+- `workout_target`
+- `workout`
+- `workout_set`
+- `workout_plan_item`
+- `workout_log`
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Note: Only the `workout_log` table can be modified by users. All other tables are managed by personal trainers through their admin app.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## API Endpoints
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 1. Get Workout Plans
 
-## Learn More
+- **Endpoint:** `/api/plans`
+- **Method:** GET
+- **Description:** Retrieves all workout plans with their associated workouts and sets.
 
-To learn more about Next.js, take a look at the following resources:
+### 2. Get Workout Logs for a Specific Plan
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Endpoint:** `/api/plans/[planId]/workout-logs`
+- **Method:** GET
+- **Description:** Retrieves workout logs for a specific plan, including all logged sets and their values.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 3. Add Workout Log
 
-## Deploy on Vercel
+- **Endpoint:** `/api/plans/[planId]/add-log`
+- **Method:** POST
+- **Description:** Adds a new workout log entry for a specific plan.
+- **Request Body:**
+  ```json
+  {
+    "workouts": [
+      {
+        "id": "string",
+        "sets": [
+          {
+            "id": "string",
+            "volume": number,
+            "weight": number
+          }
+        ],
+        "oneRepMax": number (optional)
+      }
+    ]
+  }
+  ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Code References
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+For detailed implementation of these endpoints, refer to the following files:
+
+1. Get Workout Plans: `app/api/plans/route.ts`
+2. Get Workout Logs: `app/api/plans/[planId]/workout-logs/route.ts`
+3. Add Workout Log: `app/api/plans/[planId]/add-log/route.ts`
+
+## Setup and Development
+
+The project is deployed on Vercel and can be accessed at https://workout-logger-backend.vercel.app/
