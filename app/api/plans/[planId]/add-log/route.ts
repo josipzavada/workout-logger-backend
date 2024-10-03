@@ -1,37 +1,51 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@vercel/postgres';
 
+interface WorkoutSet {
+  id: string;
+  volume: number;
+  weight: number;
+}
+
+interface Workout {
+  id: string;
+  sets: WorkoutSet[];
+  oneRepMax?: number;
+}
+
+interface RequestData {
+  workouts: Workout[];
+}
+
 export async function POST(req: Request, { params }: { params: { planId: string } }) {
   const { planId } = params;
 
   try {
-    const data = await req.json();
+    const data: RequestData = await req.json();
     const { workouts } = data;
 
     const logTime = new Date().toISOString();
 
-    for (const workout of workouts) {
-      const { oneRepMax } = workout;
+    // Prepare values for batch insert
+    const values = workouts.flatMap(workout => 
+      workout.sets.map(set => [
+        planId,
+        workout.id,
+        set.id,
+        logTime,
+        set.volume,
+        set.weight,
+        workout.oneRepMax || null
+      ])
+    );
 
-      for (const set of workout.sets) {
-        const { id: workoutSetId, volume, weight } = set;
+    // Batch insert query
+    const insertLogQuery = `
+      INSERT INTO workout_log (plan_id, workout_id, workout_set_id, log_time, value, weight, one_rep_max)
+      VALUES ${values.map((_, i) => `($${i * 7 + 1}, $${i * 7 + 2}, $${i * 7 + 3}, $${i * 7 + 4}, $${i * 7 + 5}, $${i * 7 + 6}, $${i * 7 + 7})`).join(', ')}
+    `;
 
-        const insertLogQuery = `
-          INSERT INTO workout_log (plan_id, workout_id, workout_set_id, log_time, value, weight, one_rep_max)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-        `;
-
-        await sql.query(insertLogQuery, [
-          planId,
-          workout.id,
-          workoutSetId,
-          logTime,
-          volume,
-          weight,
-          oneRepMax || null,
-        ]);
-      }
-    }
+    await sql.query(insertLogQuery, values.flat());
 
     return NextResponse.json({ success: true });
   } catch (error) {
