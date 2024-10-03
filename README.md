@@ -41,11 +41,11 @@ Note: Only the `workout_log` table can be modified by users. All other tables ar
         "sets": [
           {
             "id": "string",
-            "volume": number,
-            "weight": number
+            "volume": "number",
+            "weight": "number (optional)"
           }
         ],
-        "oneRepMax": number (optional)
+        "oneRepMax": "number (optional)"
       }
     ]
   }
