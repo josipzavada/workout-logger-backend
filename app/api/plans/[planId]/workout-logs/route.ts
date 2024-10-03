@@ -92,12 +92,13 @@ export async function GET(req: Request, { params }: { params: { planId: string }
     `;
 
     const { rows } = await sql.query<WorkoutLogRow & PlanRow>(query, [planId]);
+    const validLogs = rows.filter(row => row.log_id !== null);
 
-    if (rows.length === 0) {
-      return NextResponse.json({ error: 'Workout plan not found' }, { status: 404 });
+    if (validLogs.length === 0) {
+      return NextResponse.json([]);
     }
 
-    const plansByDate = rows.reduce((acc: { [date: string]: Plan }, row) => {
+    const plansByDate = validLogs.reduce((acc: { [date: string]: Plan }, row) => {
       const logDate = row.log_time;
 
       if (!acc[logDate]) {

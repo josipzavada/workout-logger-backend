@@ -26,7 +26,6 @@ export async function POST(req: Request, { params }: { params: { planId: string 
 
     const logTime = new Date().toISOString();
 
-    // Prepare values for batch insert
     const values = workouts.flatMap(workout => 
       workout.sets.map(set => [
         planId,
@@ -39,7 +38,6 @@ export async function POST(req: Request, { params }: { params: { planId: string 
       ])
     );
 
-    // Batch insert query
     const insertLogQuery = `
       INSERT INTO workout_log (plan_id, workout_id, workout_set_id, log_time, value, weight, one_rep_max)
       VALUES ${values.map((_, i) => `($${i * 7 + 1}, $${i * 7 + 2}, $${i * 7 + 3}, $${i * 7 + 4}, $${i * 7 + 5}, $${i * 7 + 6}, $${i * 7 + 7})`).join(', ')}
