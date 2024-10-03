@@ -13,7 +13,6 @@ interface WorkoutLogRow {
   workout_id: string;
   workout_name: string;
   volume_unit: string;
-  one_rep_max: number | null;
   set_id: string | null;
   target_volume_id: string | null;
   target_weight_id: string | null;
@@ -46,7 +45,6 @@ interface Workout {
   id: string;
   name: string;
   volumeUnit: string;
-  oneRepMax: number | null;
   sets: Set[];
 }
 
@@ -63,7 +61,6 @@ export async function GET() {
         w.id AS workout_id, 
         w.name AS workout_name, 
         w.volume_unit, 
-        w.one_rep_max, 
         ws.id AS set_id, 
         ws.target_volume_id, 
         ws.target_weight_id, 
@@ -108,7 +105,6 @@ export async function GET() {
           id: row.workout_id,
           name: row.workout_name,
           volumeUnit: row.volume_unit,
-          oneRepMax: row.one_rep_max || null,
           sets: []
         };
         plan.workouts.push(workout);

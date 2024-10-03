@@ -24,7 +24,6 @@ interface WorkoutLogRow {
   workout_id: string;
   workout_name: string;
   volume_unit: string;
-  workout_one_rep_max: number | null;
   set_id: string | null;
   target_volume_id: string | null;
   target_weight_id: string | null;
@@ -77,7 +76,7 @@ export async function GET(req: Request, { params }: { params: { planId: string }
       SELECT 
         pi.id as plan_id, pi.type_name,
         wl.id as log_id, wl.log_time, wl.value, wl.weight, wl.one_rep_max, 
-        w.id as workout_id, w.name as workout_name, w.volume_unit, w.one_rep_max as workout_one_rep_max,
+        w.id as workout_id, w.name as workout_name, w.volume_unit,
         ws.id as set_id, ws.target_volume_id, ws.target_weight_id,
         vt.target_type as volume_target_type, vt.percentage_of_maximum as volume_percentage_of_maximum,
         vt.exact_value as volume_exact_value, vt.interval_start as volume_interval_start, vt.interval_end as volume_interval_end,
