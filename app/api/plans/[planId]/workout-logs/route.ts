@@ -3,7 +3,6 @@ import { sql } from '@vercel/postgres';
 
 export const dynamic = 'force-dynamic';
 
-// Define types for the data returned from the database
 interface Plan {
   id: string;
   logDate: string;
@@ -12,7 +11,7 @@ interface Plan {
 }
 
 interface PlanRow {
-  id: string;
+  plan_id: string;
   type_name: string;
 }
 
@@ -69,48 +68,44 @@ export async function GET(req: Request, { params }: { params: { planId: string }
   const { planId } = params;
 
   try {
-    const planQuery = `
-      SELECT id, type_name
-      FROM workout_plan_item
-      WHERE id = $1
-    `;
-    const planResult = await sql.query<PlanRow>(planQuery, [planId]);
-
-    if (planResult.rowCount === 0) {
-      return NextResponse.json({ error: 'Workout plan not found' }, { status: 404 });
-    }
-
-    const firstPlanRow = planResult.rows[0];
-
-    const logsQuery = `
-      SELECT wl.id as log_id, wl.log_time, wl.value, wl.weight, wl.one_rep_max, 
-             w.id as workout_id, w.name as workout_name, w.volume_unit, w.one_rep_max as workout_one_rep_max,
-             ws.id as set_id, ws.target_volume_id, ws.target_weight_id,
-             vt.target_type as volume_target_type, vt.percentage_of_maximum as volume_percentage_of_maximum,
-             vt.exact_value as volume_exact_value, vt.interval_start as volume_interval_start, vt.interval_end as volume_interval_end,
-             wt.target_type as weight_target_type, wt.percentage_of_maximum as weight_percentage_of_maximum,
-             wt.exact_value as weight_exact_value, wt.interval_start as weight_interval_start, wt.interval_end as weight_interval_end
-      FROM workout_log wl
-      JOIN workout w ON wl.workout_id = w.id
+    const query = `
+      WITH plan_info AS (
+        SELECT id, type_name
+        FROM workout_plan_item
+        WHERE id = $1
+      )
+      SELECT 
+        pi.id as plan_id, pi.type_name,
+        wl.id as log_id, wl.log_time, wl.value, wl.weight, wl.one_rep_max, 
+        w.id as workout_id, w.name as workout_name, w.volume_unit, w.one_rep_max as workout_one_rep_max,
+        ws.id as set_id, ws.target_volume_id, ws.target_weight_id,
+        vt.target_type as volume_target_type, vt.percentage_of_maximum as volume_percentage_of_maximum,
+        vt.exact_value as volume_exact_value, vt.interval_start as volume_interval_start, vt.interval_end as volume_interval_end,
+        wt.target_type as weight_target_type, wt.percentage_of_maximum as weight_percentage_of_maximum,
+        wt.exact_value as weight_exact_value, wt.interval_start as weight_interval_start, wt.interval_end as weight_interval_end
+      FROM plan_info pi
+      LEFT JOIN workout_log wl ON wl.plan_id = pi.id
+      LEFT JOIN workout w ON wl.workout_id = w.id
       LEFT JOIN workout_set ws ON ws.id = wl.workout_set_id
       LEFT JOIN workout_target vt ON vt.id = ws.target_volume_id
       LEFT JOIN workout_target wt ON wt.id = ws.target_weight_id
-      WHERE wl.plan_id = $1
-      ORDER BY wl.id
+      ORDER BY wl.log_time, wl.id
     `;
 
-    const { rows } = await sql.query<WorkoutLogRow>(logsQuery, [planId]);
+    const { rows } = await sql.query<WorkoutLogRow & PlanRow>(query, [planId]);
 
-    // Group the workout logs by their log_time
-    const plansByDate = rows.reduce((acc: { [date: string]: Plan }, row: WorkoutLogRow) => {
-      const logDate = row.log_time; // Group by date only (without time)
+    if (rows.length === 0) {
+      return NextResponse.json({ error: 'Workout plan not found' }, { status: 404 });
+    }
 
-      // If there's no plan for this log date yet, create one
+    const plansByDate = rows.reduce((acc: { [date: string]: Plan }, row) => {
+      const logDate = row.log_time;
+
       if (!acc[logDate]) {
         acc[logDate] = {
-          id: firstPlanRow.id,
+          id: row.plan_id,
           logDate: logDate,
-          type: firstPlanRow.type_name,
+          type: row.type_name,
           workouts: []
         };
       }
@@ -131,39 +126,30 @@ export async function GET(req: Request, { params }: { params: { planId: string }
         interval_end: row.weight_interval_end,
       });
 
-      // Find or create the workout within this plan
-      const workout = acc[logDate].workouts.find((w) => w.id === row.workout_id);
-      if (workout) {
-        workout.sets.push({
-          id: row.set_id!,
-          targetVolume,
-          targetWeight: targetWeight || null,
-          volume: row.value || null,
-          weight: row.weight || null,
-        });
-      } else {
-        acc[logDate].workouts.push({
+      let workout = acc[logDate].workouts.find((w) => w.id === row.workout_id);
+      if (!workout) {
+        workout = {
           id: row.workout_id,
           name: row.workout_name,
           volumeUnit: row.volume_unit,
-          oneRepMax: row.one_rep_max || null,
-          logDate: row.log_time || null,
-          sets: [
-            {
-              id: row.set_id!,
-              targetVolume,
-              targetWeight: targetWeight || null,
-              volume: row.value || null,
-              weight: row.weight || null,
-            },
-          ],
-        });
+          oneRepMax: row.one_rep_max,
+          logDate: row.log_time,
+          sets: []
+        };
+        acc[logDate].workouts.push(workout);
       }
+
+      workout.sets.push({
+        id: row.set_id!,
+        targetVolume,
+        targetWeight: targetWeight || null,
+        volume: row.value,
+        weight: row.weight,
+      });
 
       return acc;
     }, {});
 
-    // Convert the plansByDate object to an array of Plan objects
     const plansArray: Plan[] = Object.values(plansByDate);
 
     return NextResponse.json(plansArray);
