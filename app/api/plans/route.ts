@@ -3,7 +3,6 @@ import { sql } from '@vercel/postgres';
 
 export const dynamic = 'force-dynamic';
 
-// Define types for the database rows
 interface Plan {
   id: string;
   type_name: string;
@@ -51,99 +50,104 @@ interface Workout {
   sets: Set[];
 }
 
-// Main function to handle GET request
 export async function GET() {
   try {
-    // Query to get workout plans
-    const plansQuery = `
-      SELECT id, type_name
-      FROM workout_plan_item
-    `;
-    const plansResult = await sql.query<Plan>(plansQuery);
-
-    if (plansResult.rowCount === 0) {
-      return NextResponse.json({ error: 'No workout plans found' }, { status: 404 });
-    }
-
-    const plans = plansResult.rows;
-
-    // Query to get workouts and sets associated with the plans
-    const workoutsQuery = `
-      SELECT w.plan_id, w.id as workout_id, w.name as workout_name, w.volume_unit, w.one_rep_max, 
-             ws.id as set_id, ws.target_volume_id, ws.target_weight_id, 
-             vt.target_type as volume_target_type, vt.percentage_of_maximum as volume_percentage_of_maximum,
-             vt.exact_value as volume_exact_value, vt.interval_start as volume_interval_start, vt.interval_end as volume_interval_end,
-             wt.target_type as weight_target_type, wt.percentage_of_maximum as weight_percentage_of_maximum,
-             wt.exact_value as weight_exact_value, wt.interval_start as weight_interval_start, wt.interval_end as weight_interval_end
-      FROM workout w
+    const query = `
+      WITH plans AS (
+        SELECT id, type_name
+        FROM workout_plan_item
+      )
+      SELECT 
+        p.id AS plan_id, 
+        p.type_name,
+        w.id AS workout_id, 
+        w.name AS workout_name, 
+        w.volume_unit, 
+        w.one_rep_max, 
+        ws.id AS set_id, 
+        ws.target_volume_id, 
+        ws.target_weight_id, 
+        vt.target_type AS volume_target_type, 
+        vt.percentage_of_maximum AS volume_percentage_of_maximum,
+        vt.exact_value AS volume_exact_value, 
+        vt.interval_start AS volume_interval_start, 
+        vt.interval_end AS volume_interval_end,
+        wt.target_type AS weight_target_type, 
+        wt.percentage_of_maximum AS weight_percentage_of_maximum,
+        wt.exact_value AS weight_exact_value, 
+        wt.interval_start AS weight_interval_start, 
+        wt.interval_end AS weight_interval_end
+      FROM plans p
+      LEFT JOIN workout w ON w.plan_id = p.id
       LEFT JOIN workout_set ws ON ws.workout_id = w.id
       LEFT JOIN workout_target vt ON vt.id = ws.target_volume_id
       LEFT JOIN workout_target wt ON wt.id = ws.target_weight_id
+      ORDER BY p.id, w.id, ws.id
     `;
 
-    const { rows } = await sql.query<WorkoutLogRow>(workoutsQuery);
+    const { rows } = await sql.query<WorkoutLogRow & Plan>(query);
 
-    // Process workout plans and associate workouts and sets
-    const workoutPlans = plans.map((plan) => {
-      const workouts = rows
-        .filter((row) => row.plan_id === plan.id)
-        .reduce((acc: Workout[], row: WorkoutLogRow) => {
-          const workout = acc.find((w) => w.id === row.workout_id);
-          const targetVolume = getTargetObject({
-            type: row.volume_target_type,
-            percentage_of_maximum: row.volume_percentage_of_maximum,
-            exact_value: row.volume_exact_value,
-            interval_start: row.volume_interval_start,
-            interval_end: row.volume_interval_end,
-          });
-          const targetWeight = getTargetObject({
-            type: row.weight_target_type,
-            percentage_of_maximum: row.weight_percentage_of_maximum,
-            exact_value: row.weight_exact_value,
-            interval_start: row.weight_interval_start,
-            interval_end: row.weight_interval_end,
-          });
+    if (rows.length === 0) {
+      return NextResponse.json({ error: 'No workout plans found' }, { status: 404 });
+    }
 
-          if (workout) {
-            workout.sets.push({
-              id: row.set_id,
-              targetVolume,
-              targetWeight: targetWeight || null,
-            });
-          } else {
-            acc.push({
-              id: row.workout_id,
-              name: row.workout_name,
-              volumeUnit: row.volume_unit,
-              oneRepMax: row.one_rep_max || null,
-              sets: [
-                {
-                  id: row.set_id,
-                  targetVolume,
-                  targetWeight: targetWeight || null,
-                },
-              ],
-            });
-          }
-          return acc;
-        }, []);
+    const workoutPlans = rows.reduce((acc, row) => {
+      if (!acc[row.plan_id]) {
+        acc[row.plan_id] = {
+          id: row.plan_id,
+          type: row.type_name,
+          workouts: []
+        };
+      }
 
-      return {
-        id: plan.id,
-        type: plan.type_name,
-        workouts: workouts,
-      };
-    });
+      const plan = acc[row.plan_id];
+      let workout = plan.workouts.find(w => w.id === row.workout_id);
 
-    // Return response as JSON
-    return NextResponse.json(workoutPlans);
+      if (!workout) {
+        workout = {
+          id: row.workout_id,
+          name: row.workout_name,
+          volumeUnit: row.volume_unit,
+          oneRepMax: row.one_rep_max || null,
+          sets: []
+        };
+        plan.workouts.push(workout);
+      }
+
+      const targetVolume = getTargetObject({
+        type: row.volume_target_type,
+        percentage_of_maximum: row.volume_percentage_of_maximum,
+        exact_value: row.volume_exact_value,
+        interval_start: row.volume_interval_start,
+        interval_end: row.volume_interval_end,
+      });
+
+      const targetWeight = getTargetObject({
+        type: row.weight_target_type,
+        percentage_of_maximum: row.weight_percentage_of_maximum,
+        exact_value: row.weight_exact_value,
+        interval_start: row.weight_interval_start,
+        interval_end: row.weight_interval_end,
+      });
+
+      workout.sets.push({
+        id: row.set_id,
+        targetVolume,
+        targetWeight: targetWeight || null,
+      });
+
+      return acc;
+    }, {} as Record<string, { id: string; type: string; workouts: Workout[] }>);
+
+    const workoutPlansArray = Object.values(workoutPlans);
+
+    return NextResponse.json(workoutPlansArray);
   } catch (error) {
     console.error('Error fetching workout plans:', error);
     return NextResponse.json({ error: 'Failed to fetch workout plans' }, { status: 500 });
   }
 }
 
-// Helper function to create a Target object
 function getTargetObject(row: {
   type: string | null;
   percentage_of_maximum: number | null;
